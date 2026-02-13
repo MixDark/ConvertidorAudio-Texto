@@ -153,6 +153,19 @@ class AudioConverterThread(QThread):
                     'word_count': len(full_text.split())
                 }
                 self.finished.emit(result)
+            except Exception as e:
+                self.error.emit(f"Error durante la conversión: {str(e)}")
+                self.progress.emit(0)
+        finally:
+            # Limpieza manual del archivo temporal (fuera de los bloques try/except)
+            if temp_wav and os.path.exists(temp_wav):
+                os.remove(temp_wav)
+            if temp_dir and os.path.exists(temp_dir):
+                try:
+                    os.rmdir(temp_dir)
+                except Exception:
+                    pass
+            self.cleanup()
 
     def _langdetect_to_google_code(self, langdetect_code):
         """Convierte el código de langdetect a un código de idioma Google Speech Recognition"""
@@ -168,23 +181,6 @@ class AudioConverterThread(QThread):
             'ru': 'ru-RU',
         }
         return mapping.get(langdetect_code)
-            except Exception as e:
-                self.error.emit(f"Error durante la transcripción: {str(e)}")
-                self.progress.emit(0)
-
-        except Exception as e:
-            self.error.emit(f"Error durante la conversión: {str(e)}")
-            self.progress.emit(0)
-        finally:
-            # Limpieza manual del archivo temporal (fuera de los bloques try/except)
-            if temp_wav and os.path.exists(temp_wav):
-                os.remove(temp_wav)
-            if temp_dir and os.path.exists(temp_dir):
-                try:
-                    os.rmdir(temp_dir)
-                except Exception:
-                    pass
-            self.cleanup()
 
     def cancel(self):
         self.is_cancelled = True
