@@ -10,7 +10,7 @@ class AppConfig:
     
     DEFAULT_CONFIG = {
         'language': 'es-ES',
-        'max_duration': 300,  # segundos
+        'max_duration': None,  # None = sin límite
         'auto_save': True,
         'window_geometry': None,
         'last_path': str(Path.home()),
@@ -25,6 +25,7 @@ class AppConfig:
         'pt-BR': 'Portugués (Brasil)',
         'ja-JP': 'Japonés',
         'zh-CN': 'Chino Simplificado',
+        'ru-RU': 'Ruso',
     }
     
     def __init__(self, config_file: str = "config.json"):
@@ -70,11 +71,14 @@ class AppConfig:
             self.config['language'] = language
             self.save_config()
     
-    def get_max_duration(self) -> int:
-        """Obtiene la duración máxima en segundos"""
-        return self.config.get('max_duration', 300)
-    
-    def set_max_duration(self, duration: int):
-        """Establece la duración máxima"""
-        self.config['max_duration'] = max(60, duration)  # Mínimo 60 segundos
+    def get_max_duration(self):
+        """Obtiene la duración máxima en segundos (None = sin límite)"""
+        return self.config.get('max_duration', None)
+
+    def set_max_duration(self, duration):
+        """Establece la duración máxima (None = sin límite)"""
+        if duration is None:
+            self.config['max_duration'] = None
+        else:
+            self.config['max_duration'] = max(60, int(duration))
         self.save_config()

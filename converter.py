@@ -1,3 +1,4 @@
+
 import speech_recognition as sr
 from moviepy import AudioFileClip
 import tempfile
@@ -8,20 +9,29 @@ from PyQt6.QtWidgets import QMessageBox
 import time
 import sys
 
+from langdetect import detect, DetectorFactory
+DetectorFactory.seed = 0
+
+
 class AudioConverterThread(QThread):
+
     progress = pyqtSignal(int)
     status = pyqtSignal(str)
     finished = pyqtSignal(dict)  # Cambiar a dict para pasar más información
     error = pyqtSignal(str)
 
+    def cleanup(self):
+        """Método de limpieza (placeholder)."""
+        pass
+
     def __init__(self, audio_file, recognizer, language='es-ES', temp_dir="temp"):
-            super().__init__()
-            self.audio_file = audio_file
-            self.recognizer = recognizer
-            self.is_cancelled = False
-            self.temp_dir = temp_dir
-            self.language = language
-            self.start_time = None
+        super().__init__()
+        self.audio_file = audio_file
+        self.recognizer = recognizer
+        self.is_cancelled = False
+        self.temp_dir = temp_dir
+        self.language = language
+        self.start_time = None
 
     def convert_mp3_to_wav(self, input_path, output_path):
         """Método separado para manejar la conversión de MP3 a WAV"""
@@ -39,6 +49,9 @@ class AudioConverterThread(QThread):
             return False
 
     def run(self):
+        temp_wav = None
+        temp_dir = None
+        detected_languages = set()
         try:
             self.start_time = time.time()
             self.status.emit("Iniciando conversión...")
@@ -93,59 +106,68 @@ class AudioConverterThread(QThread):
                 self.error.emit("El archivo de audio no existe o no es válido.")
                 return
 
-            # Procesar el audio
-            self.status.emit("Procesando audio...")
-            self.progress.emit(40)
 
+            # Transcripción con speech_recognition y detección de idioma con langdetect
             try:
+                self.status.emit("Procesando audio...")
+                self.progress.emit(40)
                 with sr.AudioFile(audio_path) as source:
-                    self.status.emit("Leyendo archivo de audio...")
-                    self.progress.emit(50)
                     audio = self.recognizer.record(source)
+                self.status.emit("Transcribiendo audio con Google...")
+                self.progress.emit(60)
+                # Transcripción precisa en todos los idiomas
+                lang_code = self.language if self.language else 'es-ES'
+                try:
+                    self.status.emit(f"Transcribiendo audio en idioma seleccionado: {lang_code}...")
+                    full_text = self.recognizer.recognize_google(audio, language=lang_code)
+                except Exception as e:
+                    self.error.emit(f"Error en la transcripción: {str(e)}")
+                    return
+                self.progress.emit(80)
+                # Detección de idioma en el texto completo
+                try:
+                    lang = detect(full_text)
+                    detected_languages.add(lang)
+                except Exception:
+                    detected_languages = set()
+                # Si el idioma detectado es diferente al seleccionado, retranscribir en el detectado
+                idioma_detectado = next(iter(detected_languages), None)
+                idioma_google = self._langdetect_to_google_code(idioma_detectado)
+                if idioma_google and idioma_google != lang_code:
+                    try:
+                        self.status.emit(f"Idioma detectado: {idioma_detectado}. Retranscribiendo en {idioma_google} para máxima precisión...")
+                        full_text = self.recognizer.recognize_google(audio, language=idioma_google)
+                        detected_languages = {idioma_detectado}
+                    except Exception as e:
+                        self.status.emit(f"No se pudo retranscribir en {idioma_google}: " + str(e))
+                idiomas_detectados = ', '.join(sorted(detected_languages)) if detected_languages else 'desconocido'
+                self.status.emit(f"Idioma detectado: {idiomas_detectados}")
+                self.progress.emit(100)
+                processing_time = time.time() - self.start_time
+                result = {
+                    'text': full_text,
+                    'duration': audio_duration,
+                    'language': idiomas_detectados,
+                    'confidence': 1.0,
+                    'processing_time': processing_time,
+                    'word_count': len(full_text.split())
+                }
+                self.finished.emit(result)
 
-                    self.status.emit("Transcribiendo audio...")
-                    self.progress.emit(70)
-
-                    # Dividir la transcripción en pasos para mostrar progreso
-                    self.status.emit("Iniciando transcripción con Google...")
-                    text = self.recognizer.recognize_google(audio, language=self.language)
-                    self.progress.emit(90)
-
-                    if text:
-                        self.status.emit("Transcripción completada")
-                        self.progress.emit(100)
-                        
-                        # Calcular tiempo de procesamiento
-                        processing_time = time.time() - self.start_time
-                        
-                        # Enviar resultado como diccionario con metadatos
-                        result = {
-                            'text': text,
-                            'duration': audio_duration,
-                            'language': self.language,
-                            'confidence': 0.95,  # Google Speech Recognition no devuelve confianza
-                            'processing_time': processing_time,
-                            'word_count': len(text.split())
-                        }
-                        self.finished.emit(result)
-                    else:
-                        self.status.emit("No se pudo extraer texto")
-                        result = {
-                            'text': 'No se pudo extraer texto del audio',
-                            'duration': audio_duration,
-                            'language': self.language,
-                            'confidence': 0,
-                            'processing_time': time.time() - self.start_time,
-                            'word_count': 0
-                        }
-                        self.finished.emit(result)
-
-            except sr.UnknownValueError:
-                self.error.emit("No se pudo reconocer el audio")
-                self.progress.emit(0)
-            except sr.RequestError as e:
-                self.error.emit(f"Error en el servicio de reconocimiento: {str(e)}")
-                self.progress.emit(0)
+    def _langdetect_to_google_code(self, langdetect_code):
+        """Convierte el código de langdetect a un código de idioma Google Speech Recognition"""
+        mapping = {
+            'es': 'es-ES',
+            'en': 'en-US',
+            'fr': 'fr-FR',
+            'de': 'de-DE',
+            'it': 'it-IT',
+            'pt': 'pt-BR',
+            'ja': 'ja-JP',
+            'zh': 'zh-CN',
+            'ru': 'ru-RU',
+        }
+        return mapping.get(langdetect_code)
             except Exception as e:
                 self.error.emit(f"Error durante la transcripción: {str(e)}")
                 self.progress.emit(0)
@@ -153,36 +175,16 @@ class AudioConverterThread(QThread):
         except Exception as e:
             self.error.emit(f"Error durante la conversión: {str(e)}")
             self.progress.emit(0)
-
         finally:
-            # Limpieza manual del archivo temporal
-            if os.path.exists(temp_wav):
+            # Limpieza manual del archivo temporal (fuera de los bloques try/except)
+            if temp_wav and os.path.exists(temp_wav):
                 os.remove(temp_wav)
-            if os.path.exists(temp_dir):
-                os.rmdir(temp_dir)
-            self.cleanup()
-
-    def cleanup(self):
-        try:
-            QThread.msleep(100)
-
-            # Eliminar archivos temporales
-            for file in Path(self.temp_dir).glob('*'):
+            if temp_dir and os.path.exists(temp_dir):
                 try:
-                    if file.exists():
-                        file.unlink(missing_ok=True)
-                except Exception as e:
-                    print(f"Error al eliminar archivo {file}: {e}")
-
-            # Eliminar directorio temporal
-            try:
-                if Path(self.temp_dir).exists():
-                    os.rmdir(self.temp_dir)
-            except Exception as e:
-                print(f"Error al eliminar directorio temporal: {e}")
-
-        except Exception as e:
-            print(f"Error en cleanup: {e}")
+                    os.rmdir(temp_dir)
+                except Exception:
+                    pass
+            self.cleanup()
 
     def cancel(self):
         self.is_cancelled = True

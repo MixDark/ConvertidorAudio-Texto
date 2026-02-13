@@ -5,7 +5,12 @@ Todos los cambios importantes en este proyecto se documentan en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
 y este proyecto se adhiere a la [Versionación Semántica](https://semver.org/lang/es/).
 
-## [2.0] - 2026-02-06
+## [2.2] - 2026-02-13
+
+### 🛠️ Mejorado
+
+- **Transcripción milimétrica en todos los idiomas**: ahora la aplicación retranscribe automáticamente en el idioma detectado para máxima precisión, no solo ruso.
+- **Detección automática de idioma**: si el audio está en ruso, la transcripción se repite en ruso para máxima precisión.
 
 ### ✨ Agregado
 

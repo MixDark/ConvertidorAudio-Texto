@@ -21,6 +21,8 @@ Una aplicación moderna y profesional para convertir archivos de audio a texto u
   - Portugués (pt-BR)
   - Japonés (ja-JP)
   - Chino Simplificado (zh-CN)
+- 🌍 Transcripción milimétrica en todos los idiomas: la aplicación detecta el idioma real del audio y retranscribe automáticamente para máxima precisión.
+- 🧠 Detección automática de idioma y retranscripción precisa.
 - ⚙️ Selector de idioma antes de convertir
 - 💾 Configuración persistente
 

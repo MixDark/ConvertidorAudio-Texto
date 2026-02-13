@@ -17,11 +17,11 @@ from styles import StyleSheet
 from history import ConversionHistory
 from config import AppConfig
 
-# Importar para exportar a diferentes formatos
+# Comprobar si python-docx está disponible
 try:
     from docx import Document
     HAS_DOCX = True
-except:
+except ImportError:
     HAS_DOCX = False
 
 try:
@@ -123,14 +123,7 @@ class SettingsDialog(QDialog):
         
         layout.addRow('Idioma:', self.language_combo)
         
-        # Duración máxima
-        self.duration_spin = QSpinBox()
-        self.duration_spin.setMinimum(60)
-        self.duration_spin.setMaximum(3600)
-        self.duration_spin.setValue(config.get_max_duration())
-        self.duration_spin.setSuffix(' segundos')
-        
-        layout.addRow('Duración máxima:', self.duration_spin)
+
         
         # Botones
         button_layout = QHBoxLayout()
@@ -151,7 +144,7 @@ class SettingsDialog(QDialog):
         return self.language_combo.currentData()
     
     def get_duration(self):
-        return self.duration_spin.value()
+        return None  # Sin límite
 
 class HistoryDialog(QDialog):
     """Diálogo para ver el historial de conversiones"""
